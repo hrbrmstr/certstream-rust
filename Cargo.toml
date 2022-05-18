@@ -3,13 +3,19 @@ name = "certstream-rust"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-websocket = "0.26.4"
-ctrlc = "3.2.2"
-redis = "0.21.5"
+# websocket ops
+url = "2.2.2" # handle websocket URLS
+tokio = { version = "1.18.2", features = ["full"] }
+tokio-stream = "0.1.8"
+tokio-tungstenite = { version = "0.17.1", features = ["native-tls"] }
+# async ops
+async-stream = "0.3.3"
+futures-util = "0.3.21"
+ctrlc = "3.2.2" # graceful exits
+itertools = "0.10.3" # vector iteration
+rocksdb = { version = "0.18.0", features = ["lz4"] } # storage for domains
+# JSON tooling
 serde = "1.0.137"
 serde_derive = "1.0.137"
 serde_json = "1.0.81"
-itertools = "*"

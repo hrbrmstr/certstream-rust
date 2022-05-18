@@ -1,134 +1,100 @@
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-
 use std::process;
-use websocket::{ClientBuilder, OwnedMessage};
+use std::str;
+
 use itertools::Itertools;
-use redis::Commands;
 
-const CERTSTREAM: &'static str = "wss://certstream.calidog.io/";
-const REDIS: &'static str = "redis://tycho.local/";
-const DOMAIN_SET: &'static str = "cert_doms";
+use tokio::io::{Result}; // AsyncWriteExt, Result};
+use tokio_tungstenite::{connect_async}; //, tungstenite::protocol::Message};
+use futures_util::{StreamExt}; // , SinkExt};
 
-#[derive(Serialize, Deserialize)]
-pub struct CertStream {
-  pub data: Option<Data>,
-  pub message_type: Option<String>,
+use url::{Url};
+use rocksdb::{DB, Options};
+
+// JSON record types for CertStream messages
+mod json_types;
+
+const CERTSTREAM_URL: &'static str = "wss://certstream.calidog.io/";
+const ROCKSDB_PATH: &'static str = "/Users/hrbrmstr/Data/cert_doms.1";
+
+macro_rules! assert_types {
+  ($($var:ident : $ty:ty),*) => { $(let _: & $ty = & $var;)* }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Data {
-  pub cert_index: Option<i64>,
-  pub cert_link: Option<String>,
-  pub leaf_cert: Option<LeafCert>,
-  pub seen: Option<f64>,
-  pub source: Option<Source>,
-  pub update_type: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LeafCert {
-  pub all_domains: Option<Vec<String>>,
-  pub extensions: Option<Extensions>,
-  pub fingerprint: Option<String>,
-  pub issuer: Option<Issuer>,
-  pub not_after: Option<i64>,
-  pub not_before: Option<i64>,
-  pub serial_number: Option<String>,
-  pub signature_algorithm: Option<String>,
-  pub subject: Option<Issuer>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Extensions {
-  #[serde(rename = "authorityInfoAccess")]
-  pub authority_info_access: Option<String>,
-  #[serde(rename = "authorityKeyIdentifier")]
-  pub authority_key_identifier: Option<String>,
-  #[serde(rename = "basicConstraints")]
-  pub basic_constraints: Option<String>,
-  #[serde(rename = "certificatePolicies")]
-  pub certificate_policies: Option<String>,
-  #[serde(rename = "ctlSignedCertificateTimestamp")]
-  pub ctl_signed_certificate_timestamp: Option<String>,
-  #[serde(rename = "extendedKeyUsage")]
-  pub extended_key_usage: Option<String>,
-  #[serde(rename = "keyUsage")]
-  pub key_usage: Option<String>,
-  #[serde(rename = "subjectAltName")]
-  pub subject_alt_name: Option<String>,
-  #[serde(rename = "subjectKeyIdentifier")]
-  pub subject_key_identifier: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Issuer {
-  #[serde(rename = "C")]
-  pub c: Option<String>,
-  #[serde(rename = "CN")]
-  pub cn: Option<String>,
-  #[serde(rename = "L")]
-  pub l: Option<serde_json::Value>,
-  #[serde(rename = "O")]
-  pub o: Option<String>,
-  #[serde(rename = "OU")]
-  pub ou: Option<serde_json::Value>,
-  #[serde(rename = "ST")]
-  pub st: Option<serde_json::Value>,
-  pub aggregated: Option<String>,
-  #[serde(rename = "emailAddress")]
-  pub email_address: Option<serde_json::Value>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Source {
-  pub name: Option<String>,
-  pub url: Option<String>,
-}
-
-fn main() {
-
+#[tokio::main]
+async fn main() -> Result<()> {
+  
   ctrlc::set_handler(move || {
     process::exit(0x0000);
   }).expect("Error setting Ctrl-C handler");
+  
+  // Setup RocksDB for writing
+  let mut options = Options::default();
+  options.set_error_if_exists(false);
+  options.create_if_missing(true);
+  options.create_missing_column_families(true);
+  
+  let db = DB::open(&options, ROCKSDB_PATH).unwrap();
+  
+  let certstream_url = Url::parse(CERTSTREAM_URL).unwrap(); // we need an actual Url type
+  
+  // IT TURNS OUT THE SERVER DOES DROP CONNECTIONS AND IT WASN'T JUST MY BAD CODE
+  // NEED TO PUT THIS IN A LOOP W/SLEEPER CODE
 
-  let mut redis_conn = redis::Client::open(REDIS)
-                        .expect("Invalid connection URL")
-                        .get_connection()
-                        .expect("Failed to connect to Redis");
+  // connect to CertStream's encrypted websocket interface 
+  let (wss_stream, _response) = connect_async(certstream_url).await.expect("Failed to connect");
+  
+  // the WebSocketStrem has sink/stream (read/srite) components; this is how we get to them
+  let (mut _write, read) = wss_stream.split();
+  
+  // process messages as they come in
+  let read_future = read.for_each(|message| async {
+    
+    match message {
       
-  let mut client = ClientBuilder::new(CERTSTREAM)
-                    .unwrap()
-                    .connect_secure(None)
-                    .unwrap();
-                    
-  for msg in client.incoming_messages() {
-
-    match msg {
-
-      Ok(msg) => {
-
-        if let OwnedMessage::Text(s) = msg { 
-          
-          let model: CertStream = serde_json::from_str(&s).unwrap();
-          
-          if let Some(data) = model.data {
-            if let Some(leaf) = data.leaf_cert {
-              if let Some(doms) = leaf.all_domains {
-                for dom in doms.into_iter().unique() {
-                  let _: ()  = redis_conn
-                                .sadd(DOMAIN_SET, dom.to_lowercase().to_string())
-                                .expect("failed to execute SADD for 'cert_doms'");
-                }
+      Ok(msg) => { // get the bytes as a str
+        if let Ok(json_data) = msg.to_text() {
+          if json_data.len() > 0 { 
+            match serde_json::from_str(&json_data) { // derserialize JSON
+              
+              Ok(record) => {
+                
+                assert_types! { record: json_types::CertStream }
+                
+                // not all CertStream responses have the same JSON schema, so we have to do this
+                // tis possible i don't know a more idiomatic Rust way of doing this
+                
+                if let Some(data) = record.data {
+                  if let Some(leaf) = data.leaf_cert {
+                    if let Some(doms) = leaf.all_domains {
+                      for dom in doms.into_iter().unique() {
+                        // println!("{}", dom);
+                        db.put(dom, "").unwrap();
+                      }
+                    }
+                  }
+                }           
               }
+              
+              Err(err) => {
+                println!("ERROR: {}", err)
+              }
+              
             }
-          } 
+          }
         }
-      },
-      Err(_err) => { break }
+        
+      }
+      
+      Err(err) => {
+        println!("ERROR: {}", err)
+      }
+      
     }
-
-  }    
+    
+  });
+  
+  read_future.await;
+  
+  Ok(())
+  
 }
