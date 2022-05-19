@@ -59,6 +59,7 @@ async fn main() -> Result<()> {
       match message {
         
         Ok(msg) => { // get the bytes as a str
+
           if let Ok(json_data) = msg.to_text() { // did the bytes convert to text ok?
 
             if json_data.len() > 0 { // do we actually have semi-valid JSON?
@@ -77,26 +78,24 @@ async fn main() -> Result<()> {
                       if let Some(doms) = leaf.all_domains {
                         for dom in doms.into_iter().unique() {
                           // println!("{}", dom); // debugging
-                          db.put(dom, "").unwrap();
+                          db.put(dom.to_ascii_lowercase(), "").unwrap(); // CertStream doms shld already be lowercase but making it explicit
                         }
                       }
                     }
                   }           
                 }
                 
-                Err(err) => {
-                  println!("ERROR: {}", err)
-                }
+                Err(err) => { println!("ERROR: {}", err) }
                 
               }
+
             }
+
           }
           
         }
         
-        Err(err) => {
-          println!("ERROR: {}", err)
-        }
+        Err(err) => { println!("ERROR: {}", err) }
         
       }
       
