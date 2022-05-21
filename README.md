@@ -1,6 +1,6 @@
 # certstream-rust
 
-Small funemployment Rust project to build a CLI program to read the websocket stream from <https://certstream.calidog.io> and log all certificate domains to a RocksDB database, plus a small utility to dump the gathered domains from RocksDB.
+Small funemployment Rust project to build a CLI program to read the websocket stream from <https://certstream.calidog.io> and log all certificate domains to a [RocksDB](http://rocksdb.org) database, plus a small utility to dump the gathered domains from [RocksDB](http://rocksdb.org).
 
 ## Building
 
@@ -11,8 +11,15 @@ cargo build --release
 
 ## Installing
 
+The following will put:
+
+- `certstream`
+- `dumpdoms`
+
+into `~/.cargo/bin` unless you've modified the behaviour of `cargo install`.
+
 ```
-cargo install --git https://github.com/hrbrmstr/certstream-rust
+$ cargo install --git https://github.com/hrbrmstr/certstream-rust
 ```
 
 ## Read from CertStream websocket
@@ -31,7 +38,7 @@ OPTIONS:
 
 e.g.
 ```
-certstream --dbpath=~/Data/cert_doms.1 # kill or ^C to stop
+$ certstream --dbpath=~/Data/cert_doms.1 # kill or ^C to stop
 ```
 
 ## See the domains
@@ -43,7 +50,7 @@ USAGE:
 
 e.g.
 ```
-dumpdoms --dbpath=~/Data/cert_doms.1 | tail -30
+$ dumpdoms --dbpath=~/Data/cert_doms.1 | tail -30
 zyw017777.direct.quickconnect.to
 zywolapki.polmedia.webd.pl
 zyx.dzign4u.com
