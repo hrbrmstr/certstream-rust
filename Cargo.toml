@@ -1,7 +1,12 @@
 [package]
 name = "certstream-rust"
-authors = [ "@hrbrmstr" ]
+authors = [ "boB Rudis (@hrbrmstr)" ]
 description = "Extract all domains from a CertStream-compatible CTL websockets server to RocksDB"
+license = "MIT"
+homepage = "https://github.com/hrbrmstr/certstream-rust"
+repository = "https://github.com/hrbrmstr/certstream-rust"
+keywords = [ "certstream", "rockdsb", "certificate" ]
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,6 +14,7 @@ edition = "2021"
 # cmdline args
 clap = { version = "3.1.18", features = ["derive"] }
 shellexpand = "2.1.0"
+libc = "0.2.126"
 # websocket ops
 url = "2.2.2" # handle websocket URLS
 tokio = { version = "1.18.2", features = ["full"] }
@@ -24,3 +30,11 @@ rocksdb = { version = "0.18.0", features = ["lz4"] } # storage for domains
 serde = "1.0.137"
 serde_derive = "1.0.137"
 serde_json = "1.0.81"
+
+[[bin]]
+path = "src/certstream/main.rs"
+name = "certstream"
+
+[[bin]]
+path = "src/dumpdoms/main.rs"
+name = "dumpdoms"

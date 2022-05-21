@@ -1,4 +1,4 @@
-// usage e.g. certstream-rust --dbpath=~/Data/cert_doms.1
+// usage e.g. certstream --dbpath=~/Data/cert_doms.1
 
 use std::process;
 use std::str;
