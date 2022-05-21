@@ -1,9 +1,14 @@
 [package]
 name = "certstream-rust"
+authors = [ "@hrbrmstr" ]
+description = "Extract all domains from a CertStream-compatible CTL websockets server to RocksDB"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# cmdline args
+clap = { version = "3.1.18", features = ["derive"] }
+shellexpand = "2.1.0"
 # websocket ops
 url = "2.2.2" # handle websocket URLS
 tokio = { version = "1.18.2", features = ["full"] }
@@ -12,7 +17,7 @@ tokio-tungstenite = { version = "0.17.1", features = ["native-tls"] }
 # async ops
 async-stream = "0.3.3"
 futures-util = "0.3.21"
-ctrlc = "3.2.2" # graceful exits
+ctrlc = "3.2.2" # graceful exits  
 itertools = "0.10.3" # vector iteration
 rocksdb = { version = "0.18.0", features = ["lz4"] } # storage for domains
 # JSON tooling
