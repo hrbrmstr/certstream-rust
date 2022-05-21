@@ -2,6 +2,19 @@
 
 Small funemployment Rust project to build a CLI program to read the websocket stream from <https://certstream.calidog.io> and log all certificate domains to a RocksDB database, plus a small utility to dump the gathered domains from RocksDB.
 
+## Building
+
+```
+git clone git@github.com:hrbrmstr/certstream-rust
+cargo build --release 
+```
+
+## Installing
+
+```
+cargo install --git https://github.com/hrbrmstr/certstream-rust
+```
+
 ## Read from CertStream websocket
 
 ```
